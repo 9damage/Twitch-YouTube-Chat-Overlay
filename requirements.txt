@@ -1,0 +1,8 @@
+PySide6>=6.7,<7
+qasync>=0.27,<1
+aiohttp>=3.10,<4
+python-dotenv>=1.0,<2
+pytest>=8.2,<9
+pytest-asyncio>=0.23,<1
+PyInstaller>=6.10,<7
+

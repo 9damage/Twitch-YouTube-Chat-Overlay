@@ -1,0 +1,16 @@
+.env
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+logs/
+dist/
+build/*
+!build/build_exe.bat
+!build/generate_ico.py
+!build/version_info.txt
+*.spec
+config.json
+credentials.dat
+
