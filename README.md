@@ -45,9 +45,16 @@ Windows SmartScreen может предупредить о новом непод
 
 Сообщения Twitch и YouTube собраны в одной ленте, а фон, рамка и размер окна настраиваются под игру. В режиме редактирования оверлей легко перемещать и растягивать; после скрытия границ он перестаёт перехватывать клики.
 
-<p align="center">
-  <img src="docs/images/overlay-edit-mode.png" width="440" alt="Оверлей Twitch и YouTube в режиме редактирования">
-</p>
+<table>
+  <tr>
+    <td width="50%" align="center"><strong>Настройка положения и размера</strong></td>
+    <td width="50%" align="center"><strong>Рабочий режим без границ</strong></td>
+  </tr>
+  <tr>
+    <td><img src="docs/images/overlay-edit-mode.png" alt="Оверлей Twitch и YouTube в режиме редактирования"></td>
+    <td><img src="docs/images/overlay-borderless.png" alt="Оверлей Twitch и YouTube без границ"></td>
+  </tr>
+</table>
 
 ## Быстрый старт
 
