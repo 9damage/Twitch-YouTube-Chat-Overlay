@@ -6,6 +6,8 @@ if not exist ".venv\Scripts\python.exe" (
   exit /b 1
 )
 if not exist "assets" mkdir assets
+".venv\Scripts\python.exe" build\prepare_icons.py assets\app-icon-source.png assets\tray-icon-source.png assets\app-icon.png assets\tray-icon.png
+if errorlevel 1 exit /b %errorlevel%
 ".venv\Scripts\python.exe" build\generate_ico.py assets\app-icon.png assets\app.ico
 if errorlevel 1 exit /b %errorlevel%
 ".venv\Scripts\python.exe" -m PyInstaller --noconfirm --clean --noconsole --onefile --name TwitchYouTubeChatOverlay --icon assets\app.ico --version-file build\version_info.txt --add-data "assets;assets" --distpath dist --workpath build\pyinstaller --paths . main.py

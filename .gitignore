@@ -9,8 +9,8 @@ dist/
 build/*
 !build/build_exe.bat
 !build/generate_ico.py
+!build/prepare_icons.py
 !build/version_info.txt
 *.spec
 config.json
 credentials.dat
-

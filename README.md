@@ -180,10 +180,11 @@ python main.py
 
 Скрипт:
 
-1. заново создаёт `assets/app.ico` из актуального `assets/app-icon.png`;
-2. запускает PyInstaller в режиме `--onefile --noconsole`;
-3. включает иконки, звуки и остальные ресурсы;
-4. создаёт `dist\TwitchYouTubeChatOverlay.exe`.
+1. создаёт основной PNG и отдельный PNG для трея из актуальных исходников;
+2. заново создаёт многоразмерный `assets/app.ico` для EXE;
+3. запускает PyInstaller в режиме `--onefile --noconsole`;
+4. включает иконки, звуки и остальные ресурсы;
+5. создаёт `dist\TwitchYouTubeChatOverlay.exe`.
 
 ## Проверки
 
