@@ -113,7 +113,9 @@ class TwitchClient:
         if self._writer:
             self._writer.close()
             try:
-                await self._writer.wait_closed()
-            except OSError as exc:
+                await asyncio.wait_for(self._writer.wait_closed(), timeout=2.0)
+            except (OSError, TimeoutError) as exc:
                 self._logger.debug("Twitch socket close error: %s", exc)
+            finally:
+                self._writer = None
         self.on_status(ConnectionStatus.DISCONNECTED, "Отключено")

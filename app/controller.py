@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
+import threading
 from datetime import UTC, datetime
 
-from PySide6.QtCore import QObject, QPoint, QRect, Signal
+from PySide6.QtCore import QObject, QPoint, QRect, QTimer, Signal
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication, QStyle, QSystemTrayIcon
 
@@ -44,6 +46,8 @@ class ApplicationController(QObject):
         self.youtube: YouTubeClient | None = None
         self.tasks: dict[str, asyncio.Task] = {}
         self._consumer: asyncio.Task | None = None
+        self._shutdown_task: asyncio.Task | None = None
+        self._force_exit_timer: threading.Timer | None = None
         self._closing = False
         self._settings_positioned = False
         self._logger = logging.getLogger(__name__)
@@ -60,7 +64,7 @@ class ApplicationController(QObject):
 
     def _connect_ui(self) -> None:
         self.overlay.settings_requested.connect(self.show_settings)
-        self.overlay.exit_requested.connect(lambda: asyncio.create_task(self.shutdown()))
+        self.overlay.exit_requested.connect(self.request_shutdown)
         self.overlay.geometry_changed.connect(self._save_geometry)
         self.settings.applied.connect(self.apply_settings)
         self.settings.test_message_requested.connect(self.send_test_messages)
@@ -87,7 +91,7 @@ class ApplicationController(QObject):
             lambda: asyncio.create_task(self.restart_client("youtube")),
         )
         self.tray_menu.add_separator()
-        self.tray_menu.add_command("Выход", lambda: asyncio.create_task(self.shutdown()))
+        self.tray_menu.add_command("Выход", self.request_shutdown)
         self.tray.activated.connect(self._on_tray_activated)
         self.tray.show()
 
@@ -219,21 +223,86 @@ class ApplicationController(QObject):
     def toggle_overlay(self) -> None:
         self.overlay.hide() if self.overlay.isVisible() else self.overlay.show()
 
+    def request_shutdown(self) -> None:
+        """Start shutdown once and retain the task until the process exits."""
+        if self._closing or (self._shutdown_task and not self._shutdown_task.done()):
+            return
+        self._shutdown_task = asyncio.create_task(
+            self.shutdown(),
+            name="application-shutdown",
+        )
+
+    def _arm_force_exit(self) -> None:
+        """Guarantee termination if a third-party cleanup call never returns."""
+        if self._force_exit_timer is not None:
+            return
+
+        def force_exit() -> None:
+            self._logger.error("Graceful shutdown timed out; forcing process exit")
+            os._exit(0)
+
+        self._force_exit_timer = threading.Timer(8.0, force_exit)
+        self._force_exit_timer.daemon = True
+        self._force_exit_timer.start()
+
+    async def _stop_client(self, name: str, client) -> None:
+        try:
+            await asyncio.wait_for(client.stop(), timeout=2.0)
+        except TimeoutError:
+            self._logger.warning("%s client did not stop within 2 seconds", name)
+        except Exception as exc:
+            self._logger.warning("Could not stop %s client: %s", name, exc)
+
     async def shutdown(self) -> None:
         if self._closing:
             return
         self._closing = True
-        self.manager.save(self.config)
-        if self._hotkeys:
-            self._hotkeys.unregister()
-            self.app.removeNativeEventFilter(self._hotkeys)
-        for client in (self.twitch, self.youtube):
-            if client:
-                await client.stop()
-        for task in self.tasks.values():
-            task.cancel()
-        if self._consumer:
-            self._consumer.cancel()
-        await asyncio.gather(*self.tasks.values(), *( [self._consumer] if self._consumer else []), return_exceptions=True)
+        self._arm_force_exit()
+
+        # Give immediate visual feedback even if network cleanup needs a moment.
+        self.tray_menu.hide()
         self.tray.hide()
-        self.app.quit()
+        self.settings.hide()
+        self.overlay.hide()
+
+        try:
+            try:
+                self.manager.save(self.config)
+            except Exception as exc:
+                self._logger.warning("Could not save settings during shutdown: %s", exc)
+
+            if self._hotkeys:
+                try:
+                    self._hotkeys.unregister()
+                    self.app.removeNativeEventFilter(self._hotkeys)
+                except Exception as exc:
+                    self._logger.warning("Could not unregister hotkeys: %s", exc)
+                finally:
+                    self._hotkeys = None
+
+            pending = list(self.tasks.values())
+            if self._consumer:
+                pending.append(self._consumer)
+            for task in pending:
+                task.cancel()
+            if pending:
+                try:
+                    await asyncio.wait_for(
+                        asyncio.gather(*pending, return_exceptions=True),
+                        timeout=3.0,
+                    )
+                except TimeoutError:
+                    self._logger.warning("Background tasks did not stop within 3 seconds")
+
+            clients = []
+            if self.twitch:
+                clients.append(self._stop_client("Twitch", self.twitch))
+            if self.youtube:
+                clients.append(self._stop_client("YouTube", self.youtube))
+            if clients:
+                await asyncio.gather(*clients)
+        finally:
+            self.tasks.clear()
+            self._consumer = None
+            # Let this coroutine return before stopping qasync's event loop.
+            QTimer.singleShot(0, self.app.quit)

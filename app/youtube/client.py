@@ -202,5 +202,10 @@ class YouTubeClient:
     async def stop(self) -> None:
         self._stopping = True
         if self._session and not self._session.closed:
-            await self._session.close()
+            try:
+                await asyncio.wait_for(self._session.close(), timeout=2.0)
+            except TimeoutError:
+                self._logger.debug("YouTube session close timed out")
+            finally:
+                self._session = None
         self.on_status(ConnectionStatus.DISCONNECTED, "Отключено")
